@@ -4,6 +4,7 @@ class Sprite {
     imageSrc,
     scale = 1,
     framesMax = 1,
+    flipped = 0,
     offset = { x: 0, y: 0 }
   }) {
     this.position = position
@@ -17,20 +18,36 @@ class Sprite {
     this.framesElapsed = 0
     this.framesHold = 5
     this.offset = offset
+    this.flipped = flipped
   }
 
   draw() {
-    c.drawImage(
-      this.image,
-      this.framesCurrent * (this.image.width / this.framesMax),
-      0,
-      this.image.width / this.framesMax,
-      this.image.height,
-      this.position.x - this.offset.x,
-      this.position.y - this.offset.y,
-      (this.image.width / this.framesMax) * this.scale,
-      this.image.height * this.scale
-    )
+      if(this.flipped){
+        c.drawImage(
+          this.image,
+          this.image.width - ((this.framesCurrent + 1) * (this.image.width / this.framesMax)),
+          0,
+          this.image.width / this.framesMax,
+          this.image.height,
+          this.position.x - this.offset.x,
+          this.position.y - this.offset.y,
+          (this.image.width / this.framesMax) * this.scale,
+          this.image.height * this.scale
+        ) 
+      } else {
+        c.drawImage(
+          this.image,
+          this.framesCurrent * (this.image.width / this.framesMax),
+          0,
+          this.image.width / this.framesMax,
+          this.image.height,
+          this.position.x - this.offset.x,
+          this.position.y - this.offset.y,
+          (this.image.width / this.framesMax) * this.scale,
+          this.image.height * this.scale
+        )
+      
+    }
   }
 
   animateFrames() {
@@ -56,16 +73,20 @@ class Fighter extends Sprite {
     position,
     velocity,
     color = 'red',
+    flipped,
     imageSrc,
+    imageSrcFlipped,
     scale = 1,
     framesMax = 1,
     offset = { x: 0, y: 0 },
     sprites,
-    attackBox = {strenghtMultiplier: undefined, offset: {}, width: undefined, height: undefined }
+    attackBox = {damage:20, offset: {}, width: undefined, height: undefined, frameHit: undefined }
   }) {
     super({
       position,
+      flipped,
       imageSrc,
+      imageSrcFlipped,
       scale,
       framesMax,
       offset
@@ -76,14 +97,15 @@ class Fighter extends Sprite {
     this.height = 150
     this.lastKey
     this.attackBox = {
-      strenghtMultiplier: attackBox.strenghtMultiplier,
+      damage: attackBox.damage,
       position: {
         x: this.position.x,
         y: this.position.y
       },
-      offset: attackBox.offset,
+      offset: attackBox.offset ,
       width: attackBox.width,
-      height: attackBox.height
+      height: attackBox.height,
+      frameHit: attackBox.frameHit
     }
     this.color = color
     this.isAttacking
@@ -96,7 +118,7 @@ class Fighter extends Sprite {
 
     for (const sprite in this.sprites) {
       sprites[sprite].image = new Image()
-      sprites[sprite].image.src = sprites[sprite].imageSrc
+      sprites[sprite].image.src = this.flipped ? sprites[sprite].imageSrcFlipped : sprites[sprite].imageSrc
     }
   }
 
@@ -105,7 +127,7 @@ class Fighter extends Sprite {
     if (!this.dead) this.animateFrames()
 
     // attack boxes
-    this.attackBox.position.x = this.position.x + this.attackBox.offset.x
+    this.attackBox.position.x = this.flipped ? this.position.x - this.attackBox.width - this.attackBox.offset.x + this.width : this.position.x + this.attackBox.offset.x
     this.attackBox.position.y = this.position.y + this.attackBox.offset.y
 
     // draw the player hurtbox
@@ -133,6 +155,18 @@ class Fighter extends Sprite {
       this.velocity.y = 0
     }
 
+    // prevent left overflow
+    if(this.position.x < 0){
+      this.position.x = 0
+      this.velocity.x = 0
+    }
+
+    // prevent right overflow
+    if(this.position.x > canvas.width - this.width){
+      this.position.x = canvas.width - this.width
+      this.velocity.x = 0
+    }
+
     // gravity function
     if (this.position.y + this.height + this.velocity.y >= canvas.height - 96) {
       this.velocity.y = 0
@@ -143,15 +177,25 @@ class Fighter extends Sprite {
   attack() {
     this.switchSprite('attack1')
     this.isAttacking = true
+    console.log(`attack on frame ${this.attackBox.frameHit}`)
+
   }
 
-  takeHit() {
-    this.health -= (20 * this.attackBox.strenghtMultiplier)
-    console.log(`hit ${20 * this.attackBox.strenghtMultiplier}`)
+  takeHit(enemyDamage) {
+    this.health -= enemyDamage
+    console.log(`hit ${enemyDamage}`)
     if (this.health <= 0) {
       this.health = 0;
       this.switchSprite('death')
     } else this.switchSprite('takeHit')
+  }
+
+  flipSprites(sprites){
+    for (const sprite in sprites) {
+      sprites[sprite].image = new Image()
+      console.log(`flipped ${this.flipped}`)
+      sprites[sprite].image.src = this.flipped ? sprites[sprite].imageSrcFlipped : sprites[sprite].imageSrc
+    }
   }
 
   switchSprite(sprite) {
